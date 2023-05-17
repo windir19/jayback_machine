@@ -47,7 +47,17 @@ class Update(threading.Thread):
             else:
                 update_log(f"{str(assignment.name)} contains no extra spaces.") 
 
-        update_log("DONE clearing extra spaces from titles of all modules, pages and assignments.") 
+        # Clearing spaces from all quizzes
+        to_quizzes = to_course.get_quizzes(per_page=200)
+        for quiz in to_quizzes:
+            if bool(re.search(' {2,}', str(quiz.title))):
+                quiz_name = remove_spaces(str(quiz.title))
+                quiz.edit(quiz={'title': quiz_name})
+                update_log(f"{str(quiz.title)} changed to {quiz_name}") 
+            else:
+                update_log(f"{str(quiz.title)} contains no extra spaces.") 
+
+        update_log("DONE clearing extra spaces from titles of all modules, pages, assignments, and quizzes.") 
 
     # Change Module Names
     def change_module_names(self, to_course, to_start_date, spring_break_status:int):
@@ -155,12 +165,7 @@ class Update(threading.Thread):
             return date.shift(days=-7)
         elif spring_break_status == 1:  
             return date.shift(days=+7)
-    """
-    The problem I think is in the sb_assignment, sb_quiz, and sb_todo shift functions. Part of the reason they are different functions is: depending on how you shift dates means you have to account
-    for the due date being logically between the unlock and lock dates. Also each function then calls upon different .edit() functions with the Canvas API. 
-    I realize there is a lot of redundancies but my lack of knowledge in Python makes me struggle to try to find a way to make it more Pythonic or even the words to research a better way of doing this.
-    The only thing in scope now is why the date for week 7 are erroneously getting  getting copied forward when adding Spring Break (There is no problems when removing Spring Break).
-    """
+
     # Function for Assignment Spring Break Lock-At "Availible Until" date shift
     def sb_assignment_lock_at_shift(self, assignment, week_start, spring_break_status:int):
         if assignment.lock_at != None:
@@ -251,15 +256,11 @@ class Update(threading.Thread):
 
         week_start = datetime.fromisoformat(to_start_date)
         week_start = arrow.get(week_start).to("US/Central")
-        week_start += timedelta(days=49)
+        week_start += timedelta(days=50)
 
         if spring_break_status == 0:
             week_start += timedelta(days=7)
-            """
-            The reason the 3 functions are called in each loop the different orders is to account for the fact that Canvas throws an error if the due date is out of bounds between the unlock and lock dates. 
-            Depending on whether spring break is added or removed means the order the functions are called for each assignments (assignments and discussions) and quizzes matters. 
-            Any advice on how to simplify or optimize this is welcome as well.
-            """
+
             for assignment in to_assignments:
                 self.sb_assignment_unlock_at_shift(assignment, week_start, spring_break_status)
                 self.sb_assignment_due_date_shift(assignment, week_start, spring_break_status)
@@ -314,7 +315,9 @@ class UpdateSingleCourse(Update):
         if spring_break_status != None:
             self.spring_break_shift(to_course, self.to_start_date, spring_break_status)
         else:
-            update_log("No Spring Break shift required.") 
+            update_log("No Spring Break shift required.")
+
+        self.link_change_library_cmp(to_course) 
 
         update_log(f"{str(to_course.name)} update is complete!")
 
@@ -354,6 +357,8 @@ class UpdateMultiCourses(Update):
                 self.spring_break_shift(to_course, to_start_date, spring_break_status)
             else:
                 update_log("No Spring Break shift required.") 
+
+            self.link_change_library_cmp(to_course)
 
             update_log(f"{str(to_course.name)} update is complete!")
 
