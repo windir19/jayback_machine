@@ -19,5 +19,5 @@ TO_DATEENTRY_START_DATE = datetime.today()
 
 # Test Variables
 IS_TESTING = False
-FROM_CRS = 399648
-TO_CRS = 399912
+FROM_CRS = None
+TO_CRS = None
