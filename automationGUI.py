@@ -53,6 +53,37 @@ class RequiredInput:
         start_date = str(parser.parse(start_date))
         return start_date
 
+class Options:
+    def __init__(self, frame):
+        self.frame = frame
+        
+        row1 = ttk.Frame(self.frame)
+        row1.pack(fill=X, expand=YES, pady=(0,20))
+
+        self.sb_weeks_to_start_checkbtn_value = ttk.IntVar()
+
+        self.sb_weeks_to_start_checkbtn = ttk.Checkbutton(row1, text="Spring Break is on week:", 
+                                                          onvalue=1, offvalue=0,
+                                                          variable=self.sb_weeks_to_start_checkbtn_value,
+                                                          command=self.sb_weeks_to_start_entry_state)
+        self.sb_weeks_to_start_checkbtn.pack(side=LEFT, fill=X, padx=(0, 10))
+        self.sb_weeks_to_start_checkbtn.state(['!alternate'])
+
+        self.sb_start_week = ttk.StringVar(frame, value=8)
+
+        self.sb_weeks_to_start_entry = ttk.Spinbox(row1, textvariable=self.sb_start_week,
+                                                   width=10,
+                                                   from_=0, to=15,
+                                                   wrap=True)
+        self.sb_weeks_to_start_entry.pack(side=LEFT, fill=X)
+        self.sb_weeks_to_start_entry["state"] = "disabled"
+    
+    def sb_weeks_to_start_entry_state(self):
+        if self.sb_weeks_to_start_checkbtn_value.get() == 1:
+            self.sb_weeks_to_start_entry["state"] = "normal"
+        else:
+            self.sb_weeks_to_start_entry["state"] = "disabled"
+
 
 class ModeButtons:
     def __init__(self, frame, single_update_input, multi_update_input):
@@ -76,6 +107,7 @@ class ModeButtons:
             command=self.set_multi_course
             )
         self.multi_course_btn.pack(padx=(10, 0), side=LEFT)
+        self.multi_course_btn.config(state="disabled")
 
     def set_single_course(self):
         global SELECT_MULTIPLE_MIGRATION
@@ -99,12 +131,13 @@ class ModeButtons:
 
 
 class RunButtons:
-    def __init__(self, frame, root, main_app, mode_buttons, required_input, single_update_input, multi_update_input):
+    def __init__(self, frame, root, main_app, mode_buttons, required_input, options_input, single_update_input, multi_update_input):
         self.frame = frame
         self.root = root
         self.main_app = main_app
         self.mode_buttons = mode_buttons
         self.required_input = required_input
+        self.options_input = options_input
         self.single_update_input = single_update_input
         self.multi_update_input = multi_update_input 
 
@@ -151,7 +184,7 @@ class RunButtons:
         to_start_date = self.required_input.get_to_start_date_str()
         
         if SELECT_MULTIPLE_MIGRATION:
-            csv_file_address = self.multi_update_input.get_file_address_str()
+            csv_file_address = self.multi_update_input.filename.get()
 
             migrate_multi_courses = MigrateMultiCourses(api_token, csv_file_address, to_start_date)
             migrate_multi_courses.start()
@@ -172,18 +205,19 @@ class RunButtons:
 
         api_token = self.required_input.api_token.get()
         to_start_date = self.required_input.get_to_start_date_str()
+        sb_start_week = int(self.options_input.sb_start_week.get())
 
         if SELECT_MULTIPLE_MIGRATION:
             update_log("Updates beginning. Please wait...")
             csv_file_address = self.multi_update_input.get_file_address_str()
-            update_multi_courses = UpdateMultiCourses(api_token, to_start_date, csv_file_address)
+            update_multi_courses = UpdateMultiCourses(api_token, to_start_date, csv_file_address, sb_start_week)
             update_multi_courses.start()
         else:
             update_log("Update beginning. Please wait...")
             from_course_id = self.single_update_input.from_course.get()
             to_course_id = self.single_update_input.to_course.get()
             from_start_date = self.single_update_input.get_from_start_date_str()
-            update_single_course = UpdateSingleCourse(api_token, from_course_id, to_course_id, from_start_date, to_start_date)
+            update_single_course = UpdateSingleCourse(api_token, from_course_id, to_course_id, from_start_date, to_start_date, sb_start_week)
             update_single_course.start()
         
         self.enable_run_buttons()

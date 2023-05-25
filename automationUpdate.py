@@ -244,7 +244,7 @@ class Update(threading.Thread):
                 update_log(f"{str(page.title)} NEW to-do date: {str(page.todo_date_date)}") 
 
     # Function that shifts dates for assignments and pages
-    def spring_break_shift(self, to_course, to_start_date, spring_break_status:int):
+    def spring_break_shift(self, to_course, to_start_date, spring_break_status:int, sb_start_week:int):
         
         def shift_pages(to_pages, week_start, spring_break_status):
             for page in to_pages:
@@ -256,7 +256,8 @@ class Update(threading.Thread):
 
         week_start = datetime.fromisoformat(to_start_date)
         week_start = arrow.get(week_start).to("US/Central")
-        week_start += timedelta(days=50)
+        week_start += timedelta(weeks=sb_start_week-1, days=1)
+        update_log(f"The start of the week of Spring Break is: {week_start}")
 
         if spring_break_status == 0:
             week_start += timedelta(days=7)
@@ -290,7 +291,7 @@ class Update(threading.Thread):
 
 # Child Class to Update. Updates a single course in Canvas.
 class UpdateSingleCourse(Update):
-    def __init__(self, api_token, from_course_id, to_course_id, from_start_date, to_start_date):
+    def __init__(self, api_token, from_course_id, to_course_id, from_start_date, to_start_date, sb_start_week):
         super().__init__()
         self._stop_event = threading.Event()
         self.api_token = api_token
@@ -298,6 +299,7 @@ class UpdateSingleCourse(Update):
         self.to_course_id = to_course_id
         self.from_start_date = from_start_date
         self.to_start_date = to_start_date
+        self.sb_start_week = sb_start_week
     
     # Update single course function
     def run(self):
@@ -313,7 +315,7 @@ class UpdateSingleCourse(Update):
         self.change_module_names(to_course, self.to_start_date, spring_break_status)
         
         if spring_break_status != None:
-            self.spring_break_shift(to_course, self.to_start_date, spring_break_status)
+            self.spring_break_shift(to_course, self.to_start_date, spring_break_status, self.sb_start_week)
         else:
             update_log("No Spring Break shift required.")
 
@@ -323,12 +325,13 @@ class UpdateSingleCourse(Update):
 
 # Child Class to Update. Updates many courses in Canvas.
 class UpdateMultiCourses(Update):
-    def __init__(self, api_token, to_start_date, csv_file):
+    def __init__(self, api_token, to_start_date, csv_file, sb_start_week):
         super().__init__()
         self._stop_event = threading.Event()
         self.api_token = api_token
         self.to_start_date = to_start_date
         self.csv_file = csv_file
+        self.sb_start_week = sb_start_week
 
     # Update multiple courses function
     def run(self):
@@ -354,7 +357,7 @@ class UpdateMultiCourses(Update):
             self.change_module_names(to_course, to_start_date, spring_break_status)
             
             if spring_break_status != None:
-                self.spring_break_shift(to_course, to_start_date, spring_break_status)
+                self.spring_break_shift(to_course, to_start_date, spring_break_status, self.sb_start_week)
             else:
                 update_log("No Spring Break shift required.") 
 

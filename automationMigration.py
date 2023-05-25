@@ -1,5 +1,6 @@
 import threading
 import pandas as pd
+import arrow
 from time import sleep
 from canvasapi import Canvas, course
 from automationVariables import *
@@ -10,20 +11,22 @@ class Migrate(threading.Thread):
     # Adds groups to each of the group categories
     def add_groups(self, from_course, to_course):
         from_group_categories = from_course.get_group_categories()
-
-        for from_group_category in from_group_categories:
-            # Create the category in the to_course
-            to_group_category = to_course.create_group_category(name=from_group_category.name, group_limit=from_group_category.group_limit)
-            
-            # Notification of the group category created
-            notification_string = "Created \"" + str(from_group_category.name) + "\" Group Set in " + str(to_course.name)
-            update_log(notification_string)
-            
-            groups = from_group_category.get_groups()
-            for grp in groups:
-                to_group_category.create_group(name=grp.name)
-                notification_string = str(grp.name) + " was made in " + str(to_group_category.name)
-                update_log(notification_string)
+        if from_group_categories is not None:
+            for from_group_category in from_group_categories:
+                if from_group_category.name != "Student Groups":
+                    # Create the category in the to_course
+                    to_group_category = to_course.create_group_category(name=from_group_category.name, group_limit=from_group_category.group_limit)
+                    
+                    # Notification of the group category created
+                    notification_string = "Created \"" + str(from_group_category.name) + "\" Group Set in " + str(to_course.name)
+                    update_log(notification_string)
+                    
+                    groups = from_group_category.get_groups()
+                    if groups is not None:
+                        for grp in groups:
+                            to_group_category.create_group(name=grp.name)
+                            notification_string = str(grp.name) + " was made in " + str(to_group_category.name)
+                            update_log(notification_string)
 
 # Child Class to Migrate. Migrates many courses in Canvas
 class MigrateSingleCourse(Migrate):
@@ -96,12 +99,12 @@ class MigrateSingleCourse(Migrate):
 
 # Child Class to Migrate. Migrates many courses in Canvas
 class MigrateMultiCourses(Migrate):
-    def __init__(self, api_token, to_start_date, csv_file):
+    def __init__(self, api_token, csv_file_address, to_start_date):
         super().__init__()
         self._stop_event = threading.Event()
         self.api_token = api_token
         self.to_start_date = to_start_date
-        self.csv_file = csv_file
+        self.csv_file = csv_file_address
 
     # Checks the CSV file if all of the courses are done migrating
     def check_csv_migrate_completion(self):
@@ -142,7 +145,7 @@ class MigrateMultiCourses(Migrate):
                 from_course_id = row[data_frame.columns.get_loc("from_course_id")]
                 from_start_date = row[data_frame.columns.get_loc("from_start_date")]
                 to_course_id = row[data_frame.columns.get_loc("to_course_id")]
-                migration_id = row[data_frame.columns.get_loc("migration_id")]
+                migration_id = int(row[data_frame.columns.get_loc("migration_id")])
 
                 to_course = Canvas.get_course(self=canvas,course=to_course_id,use_sis_id=False)
                 
@@ -239,8 +242,8 @@ class MigrateMultiCourses(Migrate):
             new_data_frame = pd.concat([new_data_frame, new_row],axis=0, ignore_index=True)
             
             # Notification of which FROM course is being migrated to which TO course
-            notification_string = f"Beginning migration of {str(from_course.name)} to {str(to_course.name)}"
-            update_log(notification_string)
+            update_log(f"Beginning migration of {str(from_course.name)} to {str(to_course.name)}")
         
         data_frame.to_csv(path_or_buf=self.csv_file,index=False,index_label=None,mode='w')
+        self.check_migrations()
         update_log("Migrations complete.\n")
